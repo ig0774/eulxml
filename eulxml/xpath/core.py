@@ -122,13 +122,13 @@ lexdir = os.path.dirname(lexrules.__file__)
 lexer = None
 try:
     lexer = lex.lex(module=lexrules, optimize=1, outputdir=lexdir,
-        reflags=re.UNICODE)
+        reflags=int(re.UNICODE))
 except IOError as e:
     import errno
     if e.errno != errno.EACCES:
         raise
 if lexer is None:
-    lexer = lex.lex(module=lexrules, reflags=re.UNICODE)
+    lexer = lex.lex(module=lexrules, reflags=int(re.UNICODE))
 # then dynamically rewrite the lexer class to use the wonky override logic
 # above
 lexer.__class__ = LexerWrapper

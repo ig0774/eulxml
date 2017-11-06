@@ -30,6 +30,7 @@ from django.forms import ValidationError
 from django.forms.formsets import BaseFormSet
 
 from eulxml import xmlmap
+from eulxml.xmlmap import load_xmlobject_from_string, mods
 from eulxml.xmlmap.fields import DateTimeField     # not yet supported - testing for errors
 from eulxml.forms import XmlObjectForm, xmlobjectform_factory, SubformField
 from eulxml.forms.xmlobject import XmlObjectFormType, BaseXmlObjectListFieldFormSet, \
@@ -78,9 +79,79 @@ FIXTURE_TEXT = '''
         <text>la</text><text>fa</text>
     </foo>
 '''
+
+class SimpleDateForm(XmlObjectForm):
+    """Custom :class:`~eulxml.forms.XmlObjectForm` to edit a MODS
+    :class:`~eulxml.xmlmap.mods.Date`.  Currently only allows editing the date
+    value itself, using a :class:`~eulcommon.djangoextras.formfields.W3CDateField`.
+    """
+    date = forms.CharField(required=False)
+    class Meta:
+        model = mods.OriginInfo
+        fields = ['date']
+
 class TestForm(XmlObjectForm):
     class Meta:
         model = TestObject
+
+class TestModsForm(XmlObjectForm):
+    """Custom :class:`~eulxml.forms.XmlObjectForm` to edit MODS
+    :class:`~eulxml.xmlmap.mods.OriginInfo`.  Currently only consists
+    of simple date entry for date created and issued using :class:`SimpleDateForm`.
+    """
+    form_label = 'Origin Info'
+    #Create the subform fields from fields (xmlmap) in eulxml.
+    created = SubformField(formclass=xmlobjectform_factory(mods.DateCreated,
+                            form=SimpleDateForm, max_num=1, can_delete=False))
+    issued = SubformField(formclass=xmlobjectform_factory(mods.DateIssued,
+                            form=SimpleDateForm, max_num=1, can_delete=False),
+                          label='Date Issued')
+    # created = SubformField(formclass=SimpleDateForm)
+    # issued = SubformField(formclass=SimpleDateForm,
+    #                       label='Date Issued')
+    class Meta:
+        model = mods.OriginInfo
+        fields = ['created', 'issued']
+        
+class ModsObjectFormTest(unittest.TestCase):
+
+    FIXTURE_MODS = '''
+        <mods:mods xmlns:mods="http://www.loc.gov/mods/v3">
+        <mods:originInfo>
+        <mods:dateIssued>2011</mods:dateIssued>
+        <mods:dateCreated>2012</mods:dateCreated>
+        </mods:originInfo>
+        </mods:mods>
+    '''
+
+    post_data_date = {
+        # 'management' form data is required for django to process formsets/subforms
+        'issued-INITIAL_FORMS': '1',
+        'issued-TOTAL_FORMS': '1',
+        'issued-MAX_NUM_FORMS': '1',
+        'issued-MIN_NUM_FORMS': '0',
+        'issued-0-date': '2222',
+        'created-INITIAL_FORMS': '1',
+        'created-MIN_NUM_FORMS': '0',
+        'created-TOTAL_FORMS': '1',
+        'created-MAX_NUM_FORMS': '1',
+        'created-0-date': '2222',
+        
+        }
+
+    def setUp(self):
+        # instance of form with test object instance
+        self.modsobj = load_xmlobject_from_string(self.FIXTURE_MODS, mods.OriginInfo)
+
+    def tearDown(self):
+        pass
+
+    def test_update_dates(self):
+        update_dates_form = TestModsForm(self.post_data_date, instance=self.modsobj)
+        # check that form is valid - if no errors, this populates cleaned_data
+        self.assertTrue(update_dates_form.is_valid())
+        instance = update_dates_form.update_instance()
+        self.assert_(isinstance(instance, mods.OriginInfo))
 
 
 class XmlObjectFormTest(unittest.TestCase):
@@ -118,6 +189,8 @@ class XmlObjectFormTest(unittest.TestCase):
         'numbers-INITIAL_FORMS': 0,
         }
 
+    
+
     def setUp(self):
         # instance of form with no test object
         self.new_form = TestForm()
@@ -127,6 +200,7 @@ class XmlObjectFormTest(unittest.TestCase):
 
     def tearDown(self):
         pass
+
 
     def test_simple_fields(self):
         # there should be a form field for each simple top-level xmlmap field

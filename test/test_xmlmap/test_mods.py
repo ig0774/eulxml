@@ -304,6 +304,8 @@ class TestModsOriginInfo(unittest.TestCase):
         self.origin_info.issued.append(mods.DateIssued(date='450'))
         self.assertFalse(self.origin_info.is_empty())
 
+
+
     def test_not_empty_with_publisher(self):
         self.origin_info.publisher = 'MacMillan'
         self.assertFalse(self.origin_info.is_empty())
